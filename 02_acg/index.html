@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AC Generator Simulation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+        :root {
+            /* Light mode variables (reference image style) */
+            --bg-color: #f0f0f0;
+            --panel-bg: #e5e5e5;
+            --text-color: #333333;
+            --sidebar-bg: #e5e5e5;
+            --graph-bg: #ffffff;
+            --border-color: #cccccc;
+            --btn-bg: #ffffff;
+            --btn-hover: #e0e0e0;
+            --graph-line: #0000ff;
+            --graph-axis: #0000ff;
+            --scene-bg: #f8f8f8;
+        }
+
+        [data-theme="dark"] {
+            /* Sleek dark mode variables */
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-color: #f8fafc;
+            --sidebar-bg: #1e293b;
+            --graph-bg: #0f172a;
+            --border-color: #334155;
+            --btn-bg: #334155;
+            --btn-hover: #475569;
+            --graph-line: #38bdf8;
+            --graph-axis: #94a3b8;
+            --scene-bg: #0f172a;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* Top Controls */
+        #top-bar {
+            height: 50px;
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        .icon-btn {
+            background-color: var(--btn-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 4px;
+            height: 32px;
+            width: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+
+        .icon-btn:hover {
+            background-color: var(--btn-hover);
+        }
+
+        .icon-btn.play {
+            color: #22c55e;
+        }
+
+        .spacer {
+            flex-grow: 1;
+        }
+
+        #theme-toggle {
+            padding: 0 16px;
+            width: auto;
+            font-weight: 500;
+        }
+
+        /* Main Content split */
+        #main-content {
+            display: flex;
+            flex-grow: 1;
+            height: calc(100vh - 50px);
+        }
+
+        /* 3D Canvas Area */
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            background-color: var(--scene-bg);
+        }
+
+        #three-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Right Sidebar */
+        #sidebar {
+            width: 350px;
+            min-width: 300px;
+            background-color: var(--sidebar-bg);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        #graph-container {
+            height: 200px;
+            background-color: var(--graph-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 10px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #graphCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #text-content {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        #text-content h3 {
+            margin-top: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        #text-content ul {
+            padding-left: 20px;
+            margin: 8px 0;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid var(--border-color);
+            margin: 20px 0;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        [data-theme="dark"] ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+    <!-- FontAwesome for standard icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+    <div id="top-bar">
+        <button id="btn-play" class="icon-btn play" title="Play/Pause">
+            <i class="fas fa-play" id="play-icon"></i>
+        </button>
+        <button id="btn-step" class="icon-btn" title="Step Forward">
+            <i class="fas fa-step-forward"></i>
+        </button>
+        <button id="btn-reset" class="icon-btn" title="Reset">
+            <i class="fas fa-redo"></i>
+        </button>
+        <div class="spacer"></div>
+        <button id="theme-toggle" class="icon-btn">Toggle Dark Mode</button>
+    </div>
+
+    <div id="main-content">
+        <div id="canvas-container">
+            <!-- Three.js renderer goes here -->
+        </div>
+
+        <div id="sidebar">
+            <div id="graph-container">
+                <canvas id="graphCanvas"></canvas>
+            </div>
+            <div id="text-content">
+                <h3>Principle</h3>
+                <p>The elementary AC generator works on the principle of Faraday's Law of Electromagnetic Induction.</p>
+                <p>When a conductor cuts magnetic flux, an emf is induced in it.</p>
+
+                <hr>
+
+                <h3>Construction (As shown in Simulation)</h3>
+                <ol>
+                    <li><strong>Magnetic Field</strong><br>
+                        Strong uniform magnetic field produced by North (N) and South (S) poles.
+                    </li>
+                    <li><strong>Rectangular Coil (Armature)</strong><br>
+                        Placed between magnetic poles.<br>
+                        Consists of N turns.<br>
+                        Rotates with angular velocity &omega;.
+                    </li>
+                    <li><strong>Slip Rings (R&sup1;, R&sup2;)</strong><br>
+                        Connected to the ends of the rotating coil.<br>
+                        Allow AC to be taken out without breaking the circuit.
+                    </li>
+                    <li><strong>Carbon Brushes (B&sup1;, B&sup2;)</strong><br>
+                        Collect current from slip rings.<br>
+                        Connected to external load / galvanometer.
+                    </li>
+                    <li><strong>Galvanometer / Load</strong><br>
+                        Indicates magnitude and direction of induced emf.
+                    </li>
+                </ol>
+
+                <hr>
+
+                <h3>Working of Elementary AC Generator</h3>
+                <ul>
+                    <li>When the coil rotates in a magnetic field:
+                        <ul>
+                            <li>Its sides cut magnetic flux</li>
+                            <li>Induced emf is produced according to Faraday's Law.</li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <hr>
+
+                <h3>Expression for Induced EMF</h3>
+                <p>Magnetic flux linked with the coil:<br>
+                    &Phi; = B A cos &theta;</p>
+
+                <p>Induced emf:<br>
+                    e = -N d&Phi; / dt<br>
+                    e = N B A &omega; sin &theta;</p>
+
+                <p>Maximum emf:<br>
+                    E<sub>max</sub> = N B A &omega;</p>
+
+                <p>Hence,<br>
+                    e = E<sub>max</sub> sin(&omega;t)</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+        import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // --- STATE & UI LOGIC ---
+        let isPlaying = false;
+        let angle = 0; // Current rotation angle in radians
+        const omega = 0.02; // Angular velocity
+
+        const btnPlay = document.getElementById('btn-play');
+        const playIcon = document.getElementById('play-icon');
+        const btnStep = document.getElementById('btn-step');
+        const btnReset = document.getElementById('btn-reset');
+        const btnTheme = document.getElementById('theme-toggle');
+
+        btnPlay.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            playIcon.className = isPlaying ? 'fas fa-pause' : 'fas fa-play';
+        });
+
+        btnStep.addEventListener('click', () => {
+            if (!isPlaying) {
+                angle += omega * 5; // step forward a bit
+                if (angle >= Math.PI * 2) angle -= Math.PI * 2;
+                updateSimulationParameters();
+                drawGraph();
+            }
+        });
+
+        btnReset.addEventListener('click', () => {
+            isPlaying = false;
+            playIcon.className = 'fas fa-play';
+            angle = 0;
+            updateSimulationParameters();
+            drawGraph();
+        });
+
+        let isDarkMode = false;
+        btnTheme.addEventListener('click', () => {
+            isDarkMode = !isDarkMode;
+            if (isDarkMode) {
+                document.body.setAttribute('data-theme', 'dark');
+                scene.background = new THREE.Color('#0f172a');
+            } else {
+                document.body.removeAttribute('data-theme');
+                scene.background = new THREE.Color('#f8f8f8');
+            }
+            drawGraph(); // Redraw graph to update colors
+        });
+
+        // --- 2D GRAPH LOGIC ---
+        const canvas2D = document.getElementById('graphCanvas');
+        const ctx = canvas2D.getContext('2d');
+
+        function resizeCanvas2D() {
+            const container = document.getElementById('graph-container');
+            // Support high DPI displays
+            const dpr = window.devicePixelRatio || 1;
+            canvas2D.width = container.clientWidth * dpr;
+            canvas2D.height = container.clientHeight * dpr;
+            ctx.scale(dpr, dpr);
+            canvas2D.style.width = container.clientWidth + 'px';
+            canvas2D.style.height = container.clientHeight + 'px';
+            drawGraph();
+        }
+
+        window.addEventListener('resize', resizeCanvas2D);
+
+        function drawGraph() {
+            const w = canvas2D.clientWidth;
+            const h = canvas2D.clientHeight;
+
+            ctx.clearRect(0, 0, w, h);
+
+            const paddingX = 40;
+            const paddingY = 30;
+            const graphW = w - paddingX * 2;
+            const graphH = h - paddingY * 2;
+            const originX = paddingX;
+            const originY = h / 2;
+
+            // Get CSS variable colors
+            const style = getComputedStyle(document.body);
+            const axisColor = style.getPropertyValue('--graph-axis').trim();
+            const lineColor = style.getPropertyValue('--graph-line').trim();
+            const textColor = style.getPropertyValue('--text-color').trim();
+
+            // Draw Axes
+            ctx.beginPath();
+            ctx.moveTo(originX, paddingY);
+            ctx.lineTo(originX, h - paddingY); // Y axis
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(w - paddingX + 10, originY); // X axis
+            ctx.strokeStyle = axisColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Labels
+            ctx.fillStyle = lineColor;
+            ctx.font = '12px Inter';
+            ctx.fillText('+', originX + 5, paddingY + 10);
+            ctx.fillText('-', originX + 5, h - paddingY);
+
+            const points = [
+                { def: 0, label: '0°' },
+                { def: Math.PI / 2, label: '90°' },
+                { def: Math.PI, label: '180°' },
+                { def: Math.PI * 1.5, label: '270°' },
+                { def: Math.PI * 2, label: '360°' }
+            ];
+
+            points.forEach(pt => {
+                const x = originX + (pt.def / (Math.PI * 2)) * graphW;
+                ctx.fillText(pt.label, x - 10, originY + 15);
+            });
+
+            // Draw Sine Wave up to current angle
+            ctx.beginPath();
+
+            // To make it continuous and loop, we draw the full wave up to 'angle'
+            // If angle has wrapped, we just draw up to angle. Let's trace it fully 
+            // for the first cycle up to the angle.
+            let displayAngle = angle % (Math.PI * 2);
+            if (displayAngle < 0) displayAngle += Math.PI * 2;
+
+            for (let a = 0; a <= displayAngle; a += 0.05) {
+                const x = originX + (a / (Math.PI * 2)) * graphW;
+                const y = originY - Math.sin(a) * (graphH / 2);
+                if (a === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+
+            // Last exact point
+            const endX = originX + (displayAngle / (Math.PI * 2)) * graphW;
+            const endY = originY - Math.sin(displayAngle) * (graphH / 2);
+            ctx.lineTo(endX, endY);
+
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw vertical line at current point
+            if (displayAngle > 0.01) {
+                ctx.beginPath();
+                ctx.moveTo(endX, originY);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = lineColor;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+
+        // --- THREE.JS SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('#f8f8f8');
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(10, 20, 15);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(4, 5, 12);
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.target.set(0, 0, 0);
+
+        window.addEventListener('resize', () => {
+            if (!container) return;
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        // --- MODELING THE GENERATOR ---
+        const components = new THREE.Group();
+        scene.add(components);
+
+        let rotorGroup = new THREE.Group();
+        components.add(rotorGroup);
+
+        // Global reference for the rotatable coil
+        let acCoilMesh = null;
+
+        const gltfLoader = new GLTFLoader();
+
+        // Security check for CORS issues
+        if (window.location.protocol === 'file:') {
+            alert("SECURITY ERROR: You are opening this page via the 'file://' protocol.\\n\\nWeb browsers block 3D models (GLTF/GLB) from loading locally for security reasons (CORS).\\n\\nPlease open: http://localhost:8080/02_acg/index.html instead.");
+        }
+
+        // Adjust the path to where the model is loaded relative to the HTML URL
+        gltfLoader.setPath('/');
+        gltfLoader.load('models/ACGenerator.glb', (gltf) => {
+            const model = gltf.scene;
+
+            // Fix Materials: Traverse and ensure opaque, double-sided, and non-wireframe
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    if (child.material) {
+                        child.material.side = THREE.DoubleSide;
+                        // Sometimes GLTF materials load with transparency True when they shouldn't
+                        child.material.transparent = false;
+                        child.material.opacity = 1;
+                        child.material.depthWrite = true;
+                        child.material.needsUpdate = true;
+                    }
+                }
+                // Save a reference to the specific AC_Coil part to animate it
+                if (child.name === 'AC_Coil') {
+                    acCoilMesh = child;
+                }
+            });
+
+            // Compute bounding box to auto-scale the model to fit in the view
+            const box = new THREE.Box3().setFromObject(model);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+
+            // Center the model relative to its own geometry
+            model.position.x += (model.position.x - center.x);
+            model.position.y += (model.position.y - center.y);
+            model.position.z += (model.position.z - center.z);
+
+            // Find the maximum dimension to scale down/up to a reasonable size (e.g., 8 units wide)
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const targetSize = 8;
+            let scale = 1;
+            if (maxDim > 0) {
+                scale = targetSize / maxDim;
+                model.scale.set(scale, scale, scale);
+            }
+
+            // ONLY ADD THE MODEL
+            rotorGroup.add(model);
+
+            // Delete all the old manually generated Groups that are overlapping with the model!
+            components.children.forEach(child => {
+                if (child !== rotorGroup && child.type === "Group") {
+                    components.remove(child);
+                }
+            });
+            // Also explicitly find and remove meshes inside components (magnets, brushes, etc)
+            for (let i = components.children.length - 1; i >= 0; i--) {
+                const child = components.children[i];
+                if (child !== rotorGroup) {
+                    components.remove(child);
+                }
+            }
+
+
+            console.log("Model loaded successfully. Max Dimension: ", maxDim, " Scaled to: ", scale);
+            if (!acCoilMesh) {
+                console.warn("AC_Coil was not found in the model; animation will not turn anything.");
+            }
+        }, undefined, (error) => {
+            console.error('An error happened loading the AC Generator model:', error);
+            alert("Failed to load model: " + error.message);
+        });
+
+
+        // 7. Coordinate Axes (Top Right)
+        const axesGroup = new THREE.Group();
+        scene.add(axesGroup);
+        // Position it somewhat relative to camera, or fixed in world top-right
+        axesGroup.position.set(4, 4, 0);
+
+        const arrowX = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1, 0xff0000, 0.3, 0.2); // Red X
+        const arrowY = new THREE.ArrowHelper(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1, 0x00ff00, 0.3, 0.2); // Green Y
+        const arrowZ = new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, 0), 1, 0x0000ff, 0.3, 0.2); // Blue Z
+        const centerDotGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        const centerDot = new THREE.Mesh(centerDotGeo, new THREE.MeshBasicMaterial({ color: 0xffffff })); // White center
+        axesGroup.add(arrowX, arrowY, arrowZ, centerDot);
+        // Make it scale down a bit
+        axesGroup.scale.set(0.8, 0.8, 0.8);
+
+        // --- ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+
+        function updateSimulationParameters() {
+            // Apply rotation only to the specific coil mesh
+            // In Three.js, Y is typically up. Depending on the GLTF export, local Z might map to X or Y.
+            if (acCoilMesh) {
+                // Testing the final correct mapping which is local Y based on user feedback.
+                acCoilMesh.rotation.y = angle;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (isPlaying) {
+                // Add tiny delta per frame
+                angle += omega;
+                if (angle >= Math.PI * 2) {
+                    angle -= Math.PI * 2;
+                }
+
+                updateSimulationParameters();
+                drawGraph();
+            }
+
+            // We've removed field lines internally, so we don't animate them here anymore.
+
+            controls.update();
+
+            // Keep Axes relatively facing standard isometric or fixed
+            // axesGroup.quaternion.copy(camera.quaternion); // If we wanted it fixed to screen
+
+            renderer.render(scene, camera);
+        }
+
+        // Initialize display
+        setTimeout(resizeCanvas2D, 100);
+        updateSimulationParameters();
+        animate();
+
+    </script>
+</body>
+
+</html>
