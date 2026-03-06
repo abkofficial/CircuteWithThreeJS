@@ -496,8 +496,7 @@
         }
 
         // Adjust the path to where the model is loaded relative to the HTML URL
-        gltfLoader.setPath('/');
-        gltfLoader.load('models/ACGenerator.glb', (gltf) => {
+        gltfLoader.load('../models/ACGenerator.glb', (gltf) => {
             const model = gltf.scene;
 
             // Fix Materials: Traverse and ensure opaque, double-sided, and non-wireframe
